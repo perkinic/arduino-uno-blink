@@ -1,0 +1,17 @@
+# Arduino IDE
+*.hex
+*.eep
+build/
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.idea/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+
+# Backup local da versao anterior do firmware (nao vai para o Git)
+.backup/
