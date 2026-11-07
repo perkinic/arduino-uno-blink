@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arduino: lixeira, laser e chuva</title>
+  <meta name="description" content="Explicação interativa do projeto: lixeira automática, barreira a laser e alarme de chuva no Arduino Uno.">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header class="topo">
+    <a class="marca" href="#inicio">Arduino Uno</a>
+    <nav aria-label="Seções">
+      <a href="#simulador">Simulador</a>
+      <a href="#pinos">Pinos</a>
+      <a href="#sensores">Sensores</a>
+      <a href="#codigo">Código</a>
+      <a href="#filtro">Filtro</a>
+      <a href="#defeito">Defeito real</a>
+      <a href="#quiz">Quiz</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="inicio" class="abertura">
+      <p class="etiqueta">Projeto explicado passo a passo</p>
+      <h1>Um Arduino, três sistemas e uma ideia simples</h1>
+      <p class="lead">Todo o projeto repete o mesmo ciclo, milhares de vezes por segundo: <strong>ler os sensores</strong>, <strong>decidir</strong> e <strong>agir</strong>.</p>
+
+      <ol class="fluxo">
+        <li>
+          <h2>1. Ler</h2>
+          <ul>
+            <li>HC-SR04: distância</li>
+            <li>Sensor de luz: feixe do laser</li>
+            <li>Sensor de chuva: água na placa</li>
+          </ul>
+        </li>
+        <li class="fluxo-meio">
+          <h2>2. Decidir</h2>
+          <ul>
+            <li>Tem alguém a até 25 cm?</li>
+            <li>O feixe foi obstruído?</li>
+            <li>A placa está molhada?</li>
+          </ul>
+        </li>
+        <li>
+          <h2>3. Agir</h2>
+          <ul>
+            <li>Servo: abre ou fecha a tampa</li>
+            <li>Buzzer: apita de forma intermitente</li>
+          </ul>
+        </li>
+      </ol>
+
+      <p class="aviso"><strong>Segurança:</strong> nunca olhe para o feixe do laser nem o aponte para os olhos de alguém ou para superfícies que reflitam.</p>
+    </section>
+
+    <section id="simulador">
+      <p class="etiqueta">Experimente</p>
+      <h2>Simulador do projeto</h2>
+      <p class="lead">Mexa nos controles e veja o que o Arduino faria. O simulador usa as mesmas regras, tempos e mensagens do firmware.</p>
+
+      <div class="sim">
+        <div class="sim-cena">
+          <svg id="cena" viewBox="0 0 820 320" role="img" aria-label="Montagem com laser, sensor de luz, lixeira, buzzer e placa de chuva">
+            <text class="cena-rot" x="30" y="30">Barreira a laser</text>
+            <rect class="cena-peca" x="30" y="50" width="70" height="36" rx="5"/>
+            <text class="cena-txt" x="65" y="73" text-anchor="middle">Laser</text>
+            <line id="feixe" class="cena-feixe" x1="100" y1="68" x2="690" y2="68"/>
+            <g id="mao" class="oculto">
+              <rect class="cena-mao" x="380" y="34" width="44" height="68" rx="16"/>
+              <text class="cena-txt-mao" x="402" y="73" text-anchor="middle">mão</text>
+            </g>
+            <rect class="cena-peca" x="690" y="50" width="100" height="36" rx="5"/>
+            <text class="cena-txt" x="740" y="73" text-anchor="middle">Sensor de luz</text>
+
+            <line class="cena-divisa" x1="20" y1="124" x2="800" y2="124"/>
+
+            <text class="cena-rot" x="30" y="150">Lixeira</text>
+            <g id="tampa"><rect class="cena-tampa" x="40" y="182" width="104" height="9" rx="3"/></g>
+            <path class="cena-lixeira" d="M46 192 h92 l-9 104 h-74 z"/>
+            <rect class="cena-peca" x="146" y="232" width="30" height="24" rx="3"/>
+            <text class="cena-mini" x="161" y="272" text-anchor="middle">HC-SR04</text>
+            <line class="cena-trilha" x1="176" y1="244" x2="436" y2="244"/>
+            <line class="cena-limite" x1="208" y1="226" x2="208" y2="262"/>
+            <text class="cena-mini" x="208" y="220" text-anchor="middle">25</text>
+            <line class="cena-limite" x1="221" y1="226" x2="221" y2="262"/>
+            <text class="cena-mini" x="225" y="220" text-anchor="start">35 cm</text>
+            <circle id="pessoa" class="cena-pessoa" cx="415" cy="244" r="12"/>
+            <text id="pessoaTxt" class="cena-mini" x="415" y="284" text-anchor="middle">184 cm</text>
+
+            <text class="cena-rot" x="500" y="150">Buzzer</text>
+            <circle id="buzzerCorpo" class="cena-peca" cx="535" cy="230" r="28"/>
+            <circle class="cena-furo" cx="535" cy="230" r="6"/>
+            <g id="ondas" class="cena-ondas oculto">
+              <path d="M572 208 q16 22 0 44"/>
+              <path d="M586 196 q26 34 0 68"/>
+            </g>
+
+            <text class="cena-rot" x="650" y="150">Chuva</text>
+            <rect id="placa" class="cena-placa" x="650" y="196" width="140" height="84" rx="4"/>
+            <g class="cena-trilhas">
+              <path d="M664 208 v60 M684 208 v60 M704 208 v60 M724 208 v60 M744 208 v60 M764 208 v60"/>
+            </g>
+            <g id="gotas" class="oculto">
+              <path class="cena-gota" d="M680 170 q9 14 0 20 q-9 -6 0 -20"/>
+              <path class="cena-gota" d="M724 160 q9 14 0 20 q-9 -6 0 -20"/>
+              <path class="cena-gota" d="M764 172 q9 14 0 20 q-9 -6 0 -20"/>
+            </g>
+          </svg>
+
+          <div class="controles">
+            <div class="grupo">
+              <h3>Barreira</h3>
+              <button class="botao alterna" id="btFeixe" type="button" aria-pressed="false">Obstruir o feixe</button>
+              <button class="botao" id="btPulsoFeixe" type="button">Passar a mão rápido (30 ms)</button>
+            </div>
+            <div class="grupo">
+              <h3>Chuva</h3>
+              <button class="botao alterna" id="btChuva" type="button" aria-pressed="false">Molhar a placa</button>
+              <button class="botao" id="btPulsoChuva" type="button">Pingar uma gota (200 ms)</button>
+            </div>
+            <div class="grupo grupo-largo">
+              <h3><label for="distancia">Distância até a lixeira: <output id="distanciaTxt">184 cm</output></label></h3>
+              <input id="distancia" type="range" min="2" max="200" value="184">
+            </div>
+            <div class="grupo grupo-largo grupo-linha">
+              <button class="botao alterna" id="btLento" type="button" aria-pressed="false">Câmera lenta (10x)</button>
+              <button class="botao alterna" id="btSom" type="button" aria-pressed="false">Ligar som</button>
+              <button class="botao" id="btReset" type="button">Reset do Arduino</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sim-lado">
+          <h3>O que está nos pinos agora</h3>
+          <table class="tabela-pinos">
+            <thead><tr><th scope="col">Pino</th><th scope="col">Função</th><th scope="col">Sinal</th></tr></thead>
+            <tbody>
+              <tr><td>2</td><td>Sensor de luz</td><td id="p2"></td></tr>
+              <tr><td>3</td><td>Sensor de chuva</td><td id="p3"></td></tr>
+              <tr><td>7</td><td>Laser</td><td id="p7"></td></tr>
+              <tr><td>9</td><td>Servo</td><td id="p9"></td></tr>
+              <tr><td>12</td><td>Buzzer</td><td id="p12"></td></tr>
+            </tbody>
+          </table>
+          <p id="resumo" class="resumo" aria-live="polite"></p>
+          <h3>Monitor serial</h3>
+          <pre id="serial" class="serial" tabindex="0" aria-label="Monitor serial simulado"></pre>
+        </div>
+      </div>
+
+      <div class="experimentos">
+        <h3>Experimentos para fazer na frente da turma</h3>
+        <ol>
+          <li><strong>O filtro funciona:</strong> clique em "Pingar uma gota". A placa molha por 200 ms, mas o alarme não dispara, porque o filtro da chuva exige 500 ms.</li>
+          <li><strong>Dois alarmes, um buzzer:</strong> obstrua o feixe, molhe a placa e libere o feixe. O buzzer continua, porque ainda há chuva.</li>
+          <li><strong>A zona entre 25 e 35 cm:</strong> abra a tampa a 10 cm e leve a distância para 30 cm. A tampa continua aberta. Com ela fechada, 30 cm não abre.</li>
+          <li><strong>O reset não atrapalha:</strong> deixe o feixe obstruído e aperte "Reset do Arduino". O alarme volta sozinho, porque depende só do sensor.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="pinos">
+      <p class="etiqueta">Ligações</p>
+      <h2>Mapa de pinos do Uno</h2>
+      <p class="lead">Clique em um pino colorido para ver o que está ligado nele.</p>
+
+      <div class="placa-uno">
+        <div class="fileira" id="fileiraDigital" aria-label="Fileira digital"></div>
+        <p class="placa-nome">Arduino Uno</p>
+        <div class="fileira" id="fileiraPower" aria-label="Fileira POWER"></div>
+      </div>
+      <div class="pino-info" id="pinoInfo" aria-live="polite"></div>
+    </section>
+
+    <section id="sensores">
+      <p class="etiqueta">Componentes</p>
+      <h2>Como cada peça funciona</h2>
+      <div class="abas" role="tablist" aria-label="Componentes" id="abasSensores"></div>
+      <div class="painel-aba" id="painelSensor" role="tabpanel"></div>
+    </section>
+
+    <section id="codigo">
+      <p class="etiqueta">Firmware</p>
+      <h2>Tour pelo código</h2>
+      <p class="lead">Avance pelos passos para ler o código real de <code>src/main.cpp</code>. As linhas em destaque são as que o texto explica.</p>
+
+      <div class="tour">
+        <ol class="tour-lista" id="tourLista"></ol>
+        <div class="tour-corpo">
+          <h3 id="tourTitulo"></h3>
+          <p id="tourTexto" class="tour-texto"></p>
+          <pre class="codigo" id="tourCodigo" tabindex="0" aria-label="Trecho do código"></pre>
+          <div class="tour-nav">
+            <button class="botao" id="tourVoltar" type="button">Voltar</button>
+            <span id="tourPasso"></span>
+            <button class="botao botao-forte" id="tourAvancar" type="button">Avançar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="filtro">
+      <p class="etiqueta">Duas ideias centrais</p>
+      <h2>Por que o programa usa um filtro</h2>
+      <p class="lead">Sensores reais tremem. Uma gota pode fazer o sinal oscilar várias vezes. O filtro só aceita uma mudança que fique estável por um tempo.</p>
+
+      <div class="filtro-caixa">
+        <svg id="grafico" viewBox="0 0 800 220" role="img" aria-label="Gráfico do sinal do sensor e do estado confirmado ao longo do tempo">
+          <text class="graf-rot" x="10" y="20">Leitura do sensor (sem filtro)</text>
+          <polyline id="linhaBruta" class="graf-bruta" points=""/>
+          <text class="graf-rot" x="10" y="124">Estado confirmado (com filtro)</text>
+          <polyline id="linhaFiltrada" class="graf-filtrada" points=""/>
+        </svg>
+        <div class="filtro-controles">
+          <button class="botao botao-forte" id="btSegurar" type="button">Segure para molhar</button>
+          <div class="grupo-filtro">
+            <label for="filtroTempo">Tempo do filtro: <output id="filtroTxt">500 ms</output></label>
+            <input id="filtroTempo" type="range" min="0" max="1000" step="10" value="500">
+          </div>
+          <p class="contador">Alarmes disparados: <strong id="contaAlarmes">0</strong></p>
+        </div>
+        <p class="dica">Segure o botão por 2 segundos com o filtro em 500 ms: um alarme só. Depois, coloque o filtro em 0 ms e repita: cada tremida vira um alarme.</p>
+      </div>
+
+      <h2 class="titulo-separado">Por que o programa não usa <code>delay()</code></h2>
+      <p class="lead">O Arduino faz uma coisa de cada vez. Se ele parar para esperar, ninguém lê os sensores nesse tempo.</p>
+      <div class="comparar">
+        <div>
+          <h3>Com <code>delay()</code></h3>
+          <pre class="codigo"><span class="ruim">digitalWrite(pinoBuzzer, LOW);
+delay(200);   // parado: nao le nada
+digitalWrite(pinoBuzzer, HIGH);
+delay(200);   // parado de novo</span></pre>
+          <p>Durante o apito, a tampa não abriria e o programa não veria o feixe voltar.</p>
+        </div>
+        <div>
+          <h3>Com <code>millis()</code></h3>
+          <pre class="codigo"><span class="bom">unsigned long agora = millis();
+if (agora - ultimaTrocaBip >= intervaloBip) {
+  ultimaTrocaBip = agora;
+  definirBuzzer(!buzzerApitando);
+}</span></pre>
+          <p>O programa só olha o relógio e segue em frente. Nada trava, e os três sistemas parecem rodar ao mesmo tempo.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="defeito">
+      <p class="etiqueta">Caso real da bancada</p>
+      <h2>O sensor que apagava depois do reset</h2>
+      <p class="lead">Este defeito aconteceu de verdade neste projeto. É um bom exemplo de como investigar um problema, um teste de cada vez.</p>
+      <ol class="caso">
+        <li><h3>Sintoma</h3><p>O sensor de luz acendia no reset e apagava cerca de 1 segundo depois. O buzzer tocava mesmo com o laser em cima do sensor.</p></li>
+        <li><h3>Primeiro suspeito</h3><p>Falta de energia por causa do servo. O servo foi desligado, e o problema continuou.</p></li>
+        <li><h3>Isolando o problema</h3><p>Os fios dos pinos 7 e 12 foram retirados, e o sensor continuou apagando. Laser e buzzer saíram da lista de suspeitos.</p></li>
+        <li><h3>A pista</h3><p>Apertar o reset não corta o pino 5V. Um sensor bem alimentado nem perceberia o reset. Se ele reagia, a ligação de alimentação estava errada.</p></li>
+        <li><h3>Solução</h3><p>O fio GND do sensor saiu da fileira digital, onde ele fica colado no pino 13 e no AREF, e foi para os GND da fileira POWER. Funcionou.</p></li>
+      </ol>
+      <p class="aviso aviso-calmo"><strong>Lição:</strong> mude uma coisa de cada vez e observe. Às vezes o defeito não está no programa, e sim em um fio um furo ao lado.</p>
+    </section>
+
+    <section id="quiz">
+      <p class="etiqueta">Fixando</p>
+      <h2>Teste o que você aprendeu</h2>
+      <div id="quizCaixa"></div>
+      <p class="quiz-placar" id="quizPlacar" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <p>O código completo está em <code>src/main.cpp</code>, e a montagem detalhada está no <code>README.md</code>.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

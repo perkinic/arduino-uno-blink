@@ -10,6 +10,8 @@ Os sistemas são independentes e rodam juntos no mesmo Arduino. O buzzer toca se
 
 > ⚠️ **Laser:** nunca olhe para o feixe nem o aponte para os olhos de alguém ou para superfícies que reflitam (espelho, metal polido, vidro). Confira a mira de lado.
 
+> 🎓 **Explicação interativa:** abra [`docs/index.html`](docs/index.html) no navegador para ver o simulador, o mapa de pinos, os sensores, o tour pelo código e um quiz. Funciona offline e não precisa instalar nada.
+
 ## 📦 Materiais necessários
 
 | Item | Quantidade | Observação |
@@ -230,6 +232,10 @@ Envie `l` + ENTER para alternar entre o log normal (1/s) e o rápido (5/s).
 arduino-uno-blink/
 ├── src/
 │   └── main.cpp        # Lixeira automatica + barreira a laser + chuva
+├── docs/
+│   ├── index.html      # Explicação interativa (abra no navegador)
+│   ├── estilo.css      # Aparência da página
+│   └── app.js          # Simulador, tour pelo código e quiz
 ├── platformio.ini      # Configuração do PlatformIO (placa, porta, monitor)
 ├── README.md           # Este arquivo
 └── .gitignore          # Arquivos ignorados pelo Git
