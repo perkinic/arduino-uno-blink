@@ -1,10 +1,12 @@
 // ============================================================
-// Projeto: Arduino Uno - Lixeira Automatica + Barreira a Laser
+// Projeto: Arduino Uno - Lixeira Automatica + Barreira a Laser + Chuva
 // Descricao: um sensor ultrassonico HC-SR04 mede a distancia e um
 //            servo motor abre a tampa da lixeira quando alguem se
 //            aproxima. Quando a frente fica livre, a tampa fecha.
 //            Um laser aponta para um sensor de luz: enquanto o feixe
 //            estiver obstruido, o buzzer apita de forma intermitente.
+//            Um sensor de chuva aciona o mesmo alarme enquanto estiver
+//            molhado.
 //
 // Pinos: HC-SR04     -> VCC 5V, GND, Trig no pino 4, Echo no pino 5
 //        Servo tampa -> sinal (fio amarelo) no pino 9,
@@ -12,6 +14,7 @@
 //                       GND comum com o Arduino
 //        Laser       -> sinal no pino 7
 //        Sensor luz  -> saida digital no pino 2
+//        Sensor chuva-> saida digital DO no pino 3
 //        Buzzer      -> sinal no pino 12
 //
 // ATENCAO: nunca olhe para o feixe do laser nem o aponte para os olhos
@@ -40,6 +43,7 @@ const int pinoTrig = 4;    // HC-SR04: Trigger
 const int pinoEcho = 5;    // HC-SR04: Echo
 const int pinoServo = 9;   // servo da tampa
 const int pinoSensorLuz = 2;  // sensor de luz: saida digital
+const int pinoSensorChuva = 3;  // sensor de chuva: saida digital DO
 const int pinoLaser = 7;      // laser
 const int pinoBuzzer = 12;    // buzzer
 
@@ -69,11 +73,16 @@ const unsigned long intervaloLogRapido = 200;   // log rapido: 5 vezes por segun
 // com o feixe livre e calar com ele obstruido, troque para LOW.
 const int nivelObstruido = HIGH;
 
-// Barreira: nivel do pino que faz o buzzer apitar. Se ele apitar com o
-// feixe livre e calar com ele obstruido, troque para HIGH.
+// Chuva: nivel do DO com a placa molhada. Se o alarme tocar com a placa
+// seca e calar com ela molhada, troque para HIGH.
+const int nivelChuva = LOW;
+
+// Nivel do pino que faz o buzzer apitar. Se ele apitar sem nenhum alarme
+// e calar durante o alarme, troque para HIGH.
 const int nivelBuzzerApita = LOW;
 
 const unsigned long filtroFeixe = 50;      // leitura estavel por 50 ms vale
+const unsigned long filtroChuva = 500;     // gotas fazem o sinal oscilar
 const unsigned long intervaloBip = 200;    // 200 ms apitando, 200 ms mudo
 const unsigned long esperaLaserLigar = 200;  // sensor reagir ao laser no boot
 
@@ -94,6 +103,11 @@ unsigned long ultimaLeituraUltrassom = 0;
 bool feixeObstruido = false;      // estado confirmado da barreira
 bool ultimaLeituraFeixe = false;  // leitura mais recente, ainda sem filtro
 unsigned long momentoMudancaFeixe = 0;
+
+bool chuvaDetectada = false;      // estado confirmado do sensor de chuva
+bool ultimaLeituraChuva = false;  // leitura mais recente, ainda sem filtro
+unsigned long momentoMudancaChuva = 0;
+
 bool buzzerApitando = false;
 unsigned long ultimaTrocaBip = 0;
 
@@ -223,16 +237,15 @@ void atualizarLixeira() {
   }
 }
 
-// ------------------------- Barreira ------------------------
+// ------------------------- Alarme --------------------------
 
 void definirBuzzer(bool apitando) {
   buzzerApitando = apitando;
   digitalWrite(pinoBuzzer, apitando ? nivelBuzzerApita : !nivelBuzzerApita);
 }
 
-// Le o feixe a cada volta do loop. Enquanto ele estiver obstruido, o
-// buzzer alterna entre apitar e ficar mudo. Nao ha calibracao nem nada
-// guardado: o estado depende apenas do que o sensor mostra agora.
+// Le o feixe a cada volta do loop. Nao ha calibracao nem nada guardado:
+// o estado depende apenas do que o sensor mostra agora.
 void atualizarBarreira() {
   unsigned long agora = millis();
   bool leitura = (digitalRead(pinoSensorLuz) == nivelObstruido);
@@ -244,13 +257,39 @@ void atualizarBarreira() {
 
   if (leitura != feixeObstruido && agora - momentoMudancaFeixe >= filtroFeixe) {
     feixeObstruido = leitura;
-    ultimaTrocaBip = agora;
-    definirBuzzer(feixeObstruido);
     Serial.println(feixeObstruido ? F(">> Feixe obstruido -> alarme")
-                                  : F(">> Feixe livre -> buzzer mudo"));
+                                  : F(">> Feixe livre"));
+  }
+}
+
+// Le o sensor de chuva, com o mesmo filtro da barreira
+void atualizarChuva() {
+  unsigned long agora = millis();
+  bool leitura = (digitalRead(pinoSensorChuva) == nivelChuva);
+
+  if (leitura != ultimaLeituraChuva) {
+    ultimaLeituraChuva = leitura;
+    momentoMudancaChuva = agora;
   }
 
-  if (feixeObstruido && agora - ultimaTrocaBip >= intervaloBip) {
+  if (leitura != chuvaDetectada && agora - momentoMudancaChuva >= filtroChuva) {
+    chuvaDetectada = leitura;
+    Serial.println(chuvaDetectada ? F(">> Chuva detectada -> alarme")
+                                  : F(">> Placa de chuva seca"));
+  }
+}
+
+// Apita intermitente se qualquer sensor acusar, sem usar delay()
+void atualizarBuzzer() {
+  if (!feixeObstruido && !chuvaDetectada) {
+    if (buzzerApitando) {
+      definirBuzzer(false);
+    }
+    return;
+  }
+
+  unsigned long agora = millis();
+  if (agora - ultimaTrocaBip >= intervaloBip) {
     ultimaTrocaBip = agora;
     definirBuzzer(!buzzerApitando);
   }
@@ -258,7 +297,7 @@ void atualizarBarreira() {
 
 // ---------------------- Monitor serial ---------------------
 
-// Mostra a distancia, a tampa e a barreira de tempos em tempos
+// Mostra a distancia, a tampa, a barreira e a chuva de tempos em tempos
 void registrarDiagnostico() {
   unsigned long agora = millis();
   unsigned long intervalo = logRapido ? intervaloLogRapido : intervaloLogNormal;
@@ -280,7 +319,11 @@ void registrarDiagnostico() {
   Serial.print(F("  | sensor: "));
   Serial.print(digitalRead(pinoSensorLuz) == HIGH ? F("HIGH") : F("LOW"));
   Serial.print(F("  | feixe: "));
-  Serial.println(feixeObstruido ? F("OBSTRUIDO") : F("livre"));
+  Serial.print(feixeObstruido ? F("OBSTRUIDO") : F("livre"));
+  Serial.print(F("  | DO chuva: "));
+  Serial.print(digitalRead(pinoSensorChuva) == HIGH ? F("HIGH") : F("LOW"));
+  Serial.print(F("  | chuva: "));
+  Serial.println(chuvaDetectada ? F("SIM") : F("nao"));
 }
 
 // Comando manual pelo monitor serial: l = log rapido/normal
@@ -313,6 +356,10 @@ void setup() {
   pinMode(pinoBuzzer, OUTPUT);
 
   pinMode(pinoSensorLuz, INPUT);
+
+  // Com o pull-up, o pino le "seco" se o sensor de chuva estiver solto
+  pinMode(pinoSensorChuva, INPUT_PULLUP);
+
   pinMode(pinoLaser, OUTPUT);
   digitalWrite(pinoLaser, HIGH);
   delay(esperaLaserLigar);
@@ -322,7 +369,7 @@ void setup() {
   ultimoMovimentoServo = millis();
 
   Serial.println(F("=========================================="));
-  Serial.println(F("  Arduino Uno - Lixeira + Barreira a Laser"));
+  Serial.println(F("  Arduino Uno - Lixeira + Barreira + Chuva"));
   Serial.println(F("=========================================="));
   Serial.print(F("Abre com obstaculo a ate "));
   Serial.print(distanciaAbrir);
@@ -341,6 +388,8 @@ void loop() {
   tratarComandoSerial();
   atualizarLixeira();      // le o ultrassonico e decide abrir/fechar a tampa
   atualizarServo();        // leva o servo ao angulo alvo (e descansa quando fechado)
-  atualizarBarreira();     // le o feixe e faz o buzzer apitar intermitente
+  atualizarBarreira();     // le o feixe do laser
+  atualizarChuva();        // le o sensor de chuva
+  atualizarBuzzer();       // apita intermitente se algum sensor acusar
   registrarDiagnostico();
 }
